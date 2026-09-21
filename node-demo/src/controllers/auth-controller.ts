@@ -1,25 +1,34 @@
-import bcrypt from 'bcrypt';
 import type { Request, Response } from 'express';
 import { logger } from '../lib/logger.js';
+import { passwordService } from '../services/password-service.js';
 
 // In-memory user store for the demo. Keyed by email.
 const users = new Map<string, { id: string; email: string; passwordHash: string }>();
 
+interface Credentials {
+  email: string;
+  password: string;
+}
+
+// Returns undefined when either field is missing so callers can return a uniform 400.
+function parseCredentials(req: Request): Credentials | undefined {
+  const { email, password } = req.body as { email?: string; password?: string };
+  return email && password ? { email, password } : undefined;
+}
+
 export const authController = {
   register: async (req: Request, res: Response) => {
-    const { email, password } = req.body as { email?: string; password?: string };
-
-    if (!email || !password) {
+    const credentials = parseCredentials(req);
+    if (!credentials) {
       return res.status(400).json({ error: 'email and password are required' });
     }
+    const { email, password } = credentials;
 
     if (users.has(email)) {
       return res.status(409).json({ error: 'email already registered' });
     }
 
-    // Inline password hashing — extract me into a password service
-    const saltRounds = 12;
-    const passwordHash = await bcrypt.hash(password, saltRounds);
+    const passwordHash = await passwordService.hash(password);
 
     const id = crypto.randomUUID();
     users.set(email, { id, email, passwordHash });
@@ -29,19 +38,18 @@ export const authController = {
   },
 
   login: async (req: Request, res: Response) => {
-    const { email, password } = req.body as { email?: string; password?: string };
-
-    if (!email || !password) {
+    const credentials = parseCredentials(req);
+    if (!credentials) {
       return res.status(400).json({ error: 'email and password are required' });
     }
+    const { email, password } = credentials;
 
     const user = users.get(email);
     if (!user) {
       return res.status(401).json({ error: 'invalid credentials' });
     }
 
-    // Inline password verification — extract me into a password service
-    const valid = await bcrypt.compare(password, user.passwordHash);
+    const valid = await passwordService.verify(password, user.passwordHash);
     if (!valid) {
       logger.warn({ email }, 'Login failed: bad password');
       return res.status(401).json({ error: 'invalid credentials' });

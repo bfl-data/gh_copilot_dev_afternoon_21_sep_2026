@@ -17,4 +17,6 @@ export const config = {
   logLevel: env('LOG_LEVEL', 'info'),
   /** Runtime environment name. */
   nodeEnv: env('NODE_ENV', 'development'),
+  /** PostgreSQL connection string for Prisma. */
+  databaseUrl: env('DATABASE_URL', 'postgresql://postgres:postgres@localhost:5432/node_demo'),
 } as const;
