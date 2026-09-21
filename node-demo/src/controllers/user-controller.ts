@@ -68,6 +68,37 @@ export const userController = {
   },
 
   /**
+   * Updates an existing user profile.
+   *
+   * @param req - Express request. Params: `{ id }`. Body: `{ email, displayName }`.
+   * @param res - Express response.
+   * @returns 200 with the updated profile, 404 when no profile exists.
+   * @throws {ZodError} When the id or body fails schema validation.
+   *
+   * @example
+   *   PUT /users/9f1c… { "email": "ada@example.com", "displayName": "Ada Lovelace" }
+   *   → 200 { "id": "9f1c…", "email": "ada@example.com", "displayName": "Ada Lovelace", … }
+   */
+  update: async (req: Request, res: Response) => {
+    const { id } = userIdParamSchema.parse(req.params);
+    const { email, displayName } = createUserSchema.parse(req.body);
+
+    const profile = profiles.get(id);
+    if (!profile) {
+      logger.warn({ userId: id }, 'Profile update missed');
+      return res.status(404).json({
+        error: { code: 'USER_NOT_FOUND', message: 'No user with that id' },
+      });
+    }
+
+    const updatedProfile: UserProfile = { ...profile, email, displayName };
+    profiles.set(id, updatedProfile);
+
+    logger.info({ userId: id }, 'User profile updated');
+    return res.status(200).json(updatedProfile);
+  },
+
+  /**
    * Lists all user profiles.
    *
    * @param _req - Express request. Unused.
